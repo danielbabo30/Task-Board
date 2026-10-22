@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>לוח משימות</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;600&family=Assistant:wght@400;600&display=swap">
+<style>
+:root {
+  --bg: #f3f5f7; --surface: #ffffff; --fg: #16212b; --muted: #64717e; --line: #dde3e8;
+  --accent: #0d6b7a; --accent-fg: #ffffff;
+  --s-todo: #7b8794; --s-doing: #2f6fdb; --s-wait: #c47a0a; --s-live: #1f8a4c; --danger: #b4351f;
+  --font-display: "Rubik", "Arial Hebrew", Arial, sans-serif;
+  --font-body: "Assistant", "Arial Hebrew", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11181f; --surface: #1a232c; --fg: #e6ecf1; --muted: #93a1ae; --line: #2b3742;
+    --accent: #4fb6c6; --accent-fg: #08262c;
+    --s-todo: #9aa7b4; --s-doing: #6b9cf0; --s-wait: #e3a346; --s-live: #52c283; --danger: #f08a75;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font-body); padding: 20px 16px 48px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; margin: 0; text-wrap: balance; }
+.wrap { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.bar h1 { font-size: 22px; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; }
+.btn.danger { color: var(--danger); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type=text], input[type=email], input[type=password], select, textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; width: 100%; }
+textarea { resize: vertical; min-height: 84px; }
+.client-pill { font-family: var(--font-display); padding: 6px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+
+.board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
+@media (max-width: 900px) { .board { grid-template-columns: minmax(0, 1fr); } }
+.col { background: color-mix(in srgb, var(--surface) 55%, var(--bg)); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+.col.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg)); }
+.col-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px 6px; border-bottom: 3px solid var(--c); }
+.col-head h2 { font-size: 15px; flex: 1; }
+.count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.card:hover { border-color: var(--accent); }
+.card[draggable=true] { cursor: grab; }
+.card .t { font-weight: 600; overflow-wrap: anywhere; }
+.card .meta { display: flex; flex-wrap: wrap; gap: 6px; color: var(--muted); font-size: 13px; }
+.chip { border: 1px solid var(--line); border-radius: 99px; padding: 0 8px; }
+.chip.open { border-color: var(--s-wait); color: var(--s-wait); font-weight: 600; }
+.empty, .notice { color: var(--muted); font-size: 13px; }
+.add-row { display: flex; gap: 6px; }
+
+.history, .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.history h2 { font-size: 17px; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 560px; }
+th { text-align: start; font-size: 13px; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.num, th.num { white-space: nowrap; }
+td.done-cell { width: 70px; text-align: center; }
+input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
+
+.overlay { position: fixed; inset: 0; background: rgba(8, 14, 20, .55); display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; padding: 24px 16px; z-index: 20; }
+.modal { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; width: min(760px, 100%); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.modal-head { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.modal-head h2 { font-size: 18px; overflow-wrap: anywhere; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field > label { font-size: 13px; color: var(--muted); font-weight: 600; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.row > * { min-width: 0; }
+.status-badge { display: inline-block; padding: 1px 10px; border-radius: 99px; color: #fff; font-size: 13px; background: var(--c); }
+.hint { background: color-mix(in srgb, var(--s-wait) 14%, var(--surface)); border: 1px solid var(--s-wait); border-radius: 6px; padding: 8px 12px; font-size: 14px; margin: 0; }
+.login { max-width: 380px; margin: 8vh auto 0; display: flex; flex-direction: column; gap: 12px; }
+.toast { position: fixed; bottom: 16px; left: 16px; right: 16px; max-width: 480px; margin: auto; z-index: 40; }
+a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="empty">טוען…</p></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.76.1/dist/umd/supabase.min.js"></script>
+<script>
+/* ===== הגדרות: מלאו מ-Supabase > Project Settings > API ===== */
+const SUPABASE_URL = "https://lzgfeafcchmizjstdsvq.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_2Dzo8o0JlXmEkrPDG2Nl6A_NUIWh5Ya";
+/* ============================================================== */
+
+const STATUSES = [
+  { key: "todo",  label: "מוכן לביצוע",       color: "var(--s-todo)" },
+  { key: "doing", label: "בביצוע",            color: "var(--s-doing)" },
+  { key: "wait",  label: "ממתין לאישור לקוח", color: "var(--s-wait)" },
+  { key: "live",  label: "עלה לאוויר",        color: "var(--s-live)" }
+];
+const RESOLUTIONS = ["מחשב נייח", "נייד", "אייפון", "אנדרואיד"];
+
+const S = { clients: [], tasks: [], notes: [], profiles: [], me: null, selClient: "", openTask: null, showClients: false };
+let sb;
+const $app = document.getElementById("app");
+const isTeam = () => S.me && S.me.role === "team";
+
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "class") el.className = v;
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(kid));
+  return el;
+}
+const fmt = ts => ts ? new Date(ts).toLocaleDateString("he-IL") : "";
+const byCreated = (a, b) => a.created_at < b.created_at ? -1 : 1;
+
+function toast(msg) {
+  const n = h("div", { class: "hint toast" }, msg);
+  document.body.append(n); setTimeout(() => n.remove(), 4500);
+}
+async function run(promise) {
+  const { error } = await promise;
+  if (error) { toast("הפעולה נכשלה: " + error.message); return false; }
+  await load(); return true;
+}
+
+const myClientId = () => isTeam() ? S.selClient : (S.me && S.me.client_id) || "";
+const visibleTasks = () => S.tasks.filter(t => t.client_id === myClientId());
+const clientName = id => (S.clients.find(c => c.id === id) || {}).name || "";
+
+/* ---------- קבצים ---------- */
+async function uploadFile(file, clientId) {
+  const ext = (file.name.match(/\.[A-Za-z0-9]{1,8}$/) || [""])[0];
+  const path = `${clientId}/${crypto.randomUUID()}${ext}`;
+  const { error } = await sb.storage.from("files").upload(path, file);
+  if (error) throw error;
+  return { file_path: path, file_name: file.name };
+}
+function fileLink(path, name) {
+  return h("a", { href: "#", onclick: async e => {
+    e.preventDefault();
+    const w = window.open("", "_blank");
+    const { data, error } = await sb.storage.from("files").createSignedUrl(path, 120);
+    if (error) { if (w) w.close(); toast("פתיחת הקובץ נכשלה"); return; }
+    if (w) w.location = data.signedUrl; else location.href = data.signedUrl;
+  } }, name);
+}
+
+/* ---------- התחברות ---------- */
+function renderLogin(msg) {
+  const email = h("input", { type: "email", id: "email", autocomplete: "username" });
+  const pass = h("input", { type: "password", id: "password", autocomplete: "current-password" });
+  const out = h("p", { class: "notice" }, msg || "");
+  const act = async fn => {
+    const { error } = await fn({ email: email.value.trim(), password: pass.value });
+    if (error) out.textContent = error.message;
+  };
+  $app.replaceChildren(h("form", { class: "panel login", onsubmit: e => { e.preventDefault(); act(c => sb.auth.signInWithPassword(c)); } },
+    h("h1", {}, "לוח משימות"),
+    h("div", { class: "field" }, h("label", { for: "email" }, "אימייל"), email),
+    h("div", { class: "field" }, h("label", { for: "password" }, "סיסמה"), pass),
+    h("button", { class: "btn primary", type: "submit" }, "כניסה"),
+    h("button", { class: "btn", type: "button", onclick: async () => {
+      const { data, error } = await sb.auth.signUp({ email: email.value.trim(), password: pass.value });
+      out.textContent = error ? error.message : (data.session ? "" : "נשלח מייל אישור. אחרי האישור אפשר להתחבר.");
+    } }, "הרשמה ראשונית"), out));
+}
+
+/* ---------- רינדור ---------- */
+function render() {
+  if (!S.me) return;
+  const kids = [];
+  const noAccess = !myClientId();
+
+  const tools = h("div", { class: "tools" });
+  if (isTeam()) {
+    tools.append(h("select", { id: "client-select", "aria-label": "לקוח", style: "width:auto;min-width:160px", onchange: e => { S.selClient = e.target.value; render(); } },
+      h("option", { value: "" }, S.clients.length ? "בחרו לקוח" : "אין לקוחות עדיין"),
+      S.clients.map(c => h("option", { value: c.id, selected: c.id === S.selClient }, c.name))),
+      h("button", { class: "btn", onclick: () => { S.showClients = true; render(); } }, "לקוחות ומשתמשים"));
+  } else if (myClientId()) tools.append(h("span", { class: "client-pill" }, clientName(myClientId())));
+  tools.append(h("button", { class: "btn", onclick: () => sb.auth.signOut() }, "יציאה"));
+  kids.push(h("div", { class: "bar" }, h("h1", {}, "לוח משימות"), tools));
+
+  if (noAccess) {
+    kids.push(h("div", { class: "panel" }, h("h2", {}, isTeam() ? "בחרו לקוח" : "המשתמש שלכם עדיין לא משויך ללקוח"),
+      h("p", { class: "notice" }, isTeam() ? "הוסיפו לקוח דרך ״לקוחות ומשתמשים״ ובחרו אותו מהרשימה." : "פנו לצוות הפיתוח כדי שישייך אתכם ללקוח.")));
+  } else {
+    const tasks = visibleTasks();
+    const board = h("div", { class: "board" });
+    for (const st of STATUSES) {
+      const list = tasks.filter(t => t.status === st.key).sort(byCreated);
+      const col = h("div", { class: "col", style: `--c:${st.color}` },
+        h("div", { class: "col-head" }, h("h2", {}, st.label), h("span", { class: "count" }, String(list.length))),
+        list.length ? list.map(taskCard) : h("div", { class: "empty" }, "אין משימות"));
+      if (isTeam()) {
+        col.addEventListener("dragover", e => { e.preventDefault(); col.classList.add("over"); });
+        col.addEventListener("dragleave", () => col.classList.remove("over"));
+        col.addEventListener("drop", e => {
+          e.preventDefault(); col.classList.remove("over");
+          const id = e.dataTransfer.getData("text/plain"), t = S.tasks.find(x => x.id === id);
+          if (t && t.status !== st.key) run(sb.from("tasks").update({ status: st.key }).eq("id", id));
+        });
+        if (st.key === "todo") col.append(addTaskRow());
+      }
+      board.append(col);
+    }
+    kids.push(board, historyPanel());
+  }
+  $app.replaceChildren(...kids);
+  if (S.openTask) renderModal();
+  if (S.showClients) renderClientsModal();
+}
+
+function taskCard(t) {
+  const open = S.notes.filter(n => n.task_id === t.id && !n.handled).length;
+  const go = () => { S.openTask = t.id; renderModal(); };
+  const c = h("div", { class: "card", tabindex: "0", role: "button", draggable: isTeam(), onclick: go, onkeydown: e => { if (e.key === "Enter") go(); } },
+    h("span", { class: "t" }, t.title),
+    h("div", { class: "meta" }, t.file_path ? h("span", { class: "chip" }, "קובץ מצורף") : null,
+      t.status === "wait" && open ? h("span", { class: "chip open" }, open + " הערות פתוחות") : null));
+  if (isTeam()) c.addEventListener("dragstart", e => e.dataTransfer.setData("text/plain", t.id));
+  return c;
+}
+
+function addTaskRow() {
+  const input = h("input", { type: "text", id: "new-task", placeholder: "משימה חדשה…", "aria-label": "שם משימה חדשה" });
+  const add = () => {
+    const title = input.value.trim(); if (!title) return; input.value = "";
+    run(sb.from("tasks").insert({ client_id: S.selClient, title }));
+  };
+  input.addEventListener("keydown", e => { if (e.key === "Enter") add(); });
+  return h("div", { class: "add-row" }, input, h("button", { class: "btn primary", onclick: add }, "הוסף"));
+}
+
+function historyPanel() {
+  const ids = new Set(visibleTasks().map(t => t.id));
+  const done = S.notes.filter(n => n.handled && ids.has(n.task_id)).sort((a, b) => a.handled_at < b.handled_at ? 1 : -1);
+  const title = id => (S.tasks.find(t => t.id === id) || {}).title || "";
+  return h("section", { class: "history" }, h("h2", {}, "היסטוריית הערות שטופלו"),
+    done.length ? h("div", { class: "tablewrap" }, h("table", {},
+      h("thead", {}, h("tr", {}, h("th", {}, "משימה"), h("th", {}, "תיאור"), h("th", {}, "רזולוציה"), h("th", {}, "קובץ"), h("th", { class: "num" }, "תאריך טיפול"), isTeam() ? h("th", {}) : null)),
+      h("tbody", {}, done.map(n => h("tr", {}, h("td", {}, title(n.task_id)), h("td", {}, n.text), h("td", {}, n.resolution),
+        h("td", {}, n.file_path ? fileLink(n.file_path, n.file_name) : "—"), h("td", { class: "num" }, fmt(n.handled_at)),
+        isTeam() ? h("td", {}, h("button", { class: "btn", onclick: () => run(sb.from("notes").update({ handled: false, handled_at: null }).eq("id", n.id)) }, "החזר")) : null)))))
+      : h("p", { class: "notice" }, "הערות שסומנו כטופלו יופיעו כאן."));
+}
+
+/* ---------- חלון משימה ---------- */
+function closeModals() { S.openTask = null; S.showClients = false; document.querySelectorAll(".overlay").forEach(o => o.remove()); }
+function overlay(content) {
+  const old = document.querySelector(".overlay"), scroll = old ? old.scrollTop : 0;
+  if (old) old.remove();
+  const o = h("div", { class: "overlay", onmousedown: e => { if (e.target === o) closeModals(); } }, content);
+  document.body.append(o); o.scrollTop = scroll;
+}
+
+function renderModal() {
+  const t = S.tasks.find(x => x.id === S.openTask);
+  if (!t) { closeModals(); return; }
+  const st = STATUSES.find(s => s.key === t.status);
+  const patch = data => run(sb.from("tasks").update(data).eq("id", t.id));
+  const team = isTeam();
+
+  const body = [h("div", { class: "modal-head" },
+    team ? h("input", { type: "text", id: "task-title", value: t.title, "aria-label": "שם המשימה", style: "font:600 18px var(--font-display)", onchange: e => e.target.value.trim() && patch({ title: e.target.value.trim() }) })
+         : h("h2", {}, t.title),
+    h("button", { class: "btn", onclick: closeModals }, "סגור"))];
+
+  body.push(h("div", { class: "row" }, h("span", { class: "status-badge", style: `--c:${st.color}` }, st.label),
+    team ? h("select", { id: "task-status", "aria-label": "סטטוס", style: "width:auto", onchange: e => patch({ status: e.target.value }) },
+      STATUSES.map(s => h("option", { value: s.key, selected: s.key === t.status }, s.label))) : null));
+
+  const desc = team ? h("textarea", { id: "task-desc", onchange: e => patch({ description: e.target.value }) }) : h("div", { style: "white-space:pre-wrap;overflow-wrap:anywhere" }, t.description || "אין תיאור");
+  if (team) desc.value = t.description || "";
+  body.push(h("div", { class: "field" }, h("label", { for: "task-desc" }, "תיאור"), desc));
+
+  const fr = h("div", { class: "row" });
+  if (t.file_path) fr.append(fileLink(t.file_path, t.file_name));
+  else if (!team) fr.append(h("span", { class: "notice" }, "אין קובץ"));
+  if (team) {
+    const inp = h("input", { type: "file", id: "task-file", hidden: true, onchange: async e => {
+      const f = e.target.files[0]; if (!f) return;
+      try { patch(await uploadFile(f, t.client_id).then(r => ({ file_path: r.file_path, file_name: r.file_name }))); } catch (err) { toast("העלאת הקובץ נכשלה: " + err.message); }
+    } });
+    fr.append(inp, h("button", { class: "btn", onclick: () => inp.click() }, t.file_path ? "החלף קובץ" : "צרף קובץ"),
+      t.file_path ? h("button", { class: "btn danger", onclick: () => patch({ file_path: null, file_name: null }) }, "הסר") : null);
+  }
+  body.push(h("div", { class: "field" }, h("label", {}, "קובץ"), fr));
+
+  if (t.status === "wait") body.push(notesSection(t));
+  if (team) body.push(h("div", { class: "row" }, h("button", { class: "btn danger", id: "del-task", onclick: function () {
+    if (!this.dataset.sure) { this.dataset.sure = 1; this.textContent = "לחצו שוב למחיקה"; return; }
+    closeModals(); run(sb.from("tasks").delete().eq("id", t.id));
+  } }, "מחק משימה")));
+
+  overlay(h("div", { class: "modal", role: "dialog", "aria-label": t.title }, body));
+}
+
+function notesSection(t) {
+  const open = S.notes.filter(n => n.task_id === t.id && !n.handled).sort(byCreated);
+  const upd = (n, data) => run(sb.from("notes").update(data).eq("id", n.id));
+  const sec = h("section", { class: "panel" }, h("h3", {}, "הערות לקוח"),
+    h("p", { class: "hint" }, "המשימה ממתינה לאישור לקוח. הוסיפו הערות לפי מכשיר; לאחר שהצוות מסמן ״טופל״ ההערה עוברת להיסטוריה."));
+  const tbody = h("tbody", {}, open.map(n => {
+    const ta = h("textarea", { "aria-label": "תיאור ההערה", style: "min-height:56px", onchange: e => upd(n, { text: e.target.value }) });
+    ta.value = n.text;
+    return h("tr", {}, h("td", {}, ta),
+      h("td", {}, h("select", { "aria-label": "רזולוציה", onchange: e => upd(n, { resolution: e.target.value }) },
+        RESOLUTIONS.map(r => h("option", { value: r, selected: r === n.resolution }, r)))),
+      h("td", {}, n.file_path ? fileLink(n.file_path, n.file_name) : h("span", { class: "notice" }, "—")),
+      h("td", { class: "done-cell" }, h("input", { type: "checkbox", "aria-label": "טופל", disabled: !isTeam(), title: isTeam() ? "סמן כטופל" : "הצוות מסמן טופל",
+        onchange: e => upd(n, { handled: e.target.checked, handled_at: e.target.checked ? new Date().toISOString() : null }) })));
+  }));
+  sec.append(h("div", { class: "tablewrap" }, h("table", {},
+    h("thead", {}, h("tr", {}, h("th", {}, "תיאור"), h("th", {}, "רזולוציה"), h("th", {}, "קובץ"), h("th", {}, "טופל"))),
+    open.length ? tbody : h("tbody", {}, h("tr", {}, h("td", { colspan: 4, class: "notice" }, "אין הערות פתוחות"))))));
+
+  const text = h("textarea", { id: "new-note", placeholder: "תיאור ההערה…", "aria-label": "הערה חדשה" });
+  const res = h("select", { id: "new-note-res", "aria-label": "רזולוציה", style: "width:auto" }, RESOLUTIONS.map(r => h("option", { value: r }, r)));
+  const file = h("input", { type: "file", id: "new-note-file", "aria-label": "צרף קובץ להערה", style: "max-width:100%" });
+  sec.append(h("div", { class: "field" }, h("label", { for: "new-note" }, "הערה חדשה"), text,
+    h("div", { class: "row" }, res, file, h("button", { class: "btn primary", onclick: async function () {
+      const v = text.value.trim(); if (!v) return;
+      this.disabled = true;
+      try {
+        const f = file.files[0] ? await uploadFile(file.files[0], t.client_id) : {};
+        if (await run(sb.from("notes").insert({ task_id: t.id, client_id: t.client_id, text: v, resolution: res.value, ...f }))) { text.value = ""; file.value = ""; }
+      } catch (e) { toast("השמירה נכשלה: " + e.message); }
+      this.disabled = false;
+    } }, "הוסף הערה"))));
+  return sec;
+}
+
+/* ---------- לקוחות ומשתמשים (צוות) ---------- */
+function renderClientsModal() {
+  const name = h("input", { type: "text", id: "new-client", placeholder: "שם לקוח חדש", "aria-label": "שם לקוח חדש" });
+  const add = () => { const v = name.value.trim(); if (!v) return; name.value = ""; run(sb.from("clients").insert({ name: v })); };
+  name.addEventListener("keydown", e => { if (e.key === "Enter") add(); });
+  const setProfile = (id, data) => run(sb.from("profiles").update(data).eq("id", id));
+
+  const users = S.profiles.map(p => h("tr", {}, h("td", {}, p.email || "—"),
+    h("td", {}, h("select", { "aria-label": "תפקיד", onchange: e => setProfile(p.id, { role: e.target.value }) },
+      h("option", { value: "client", selected: p.role === "client" }, "לקוח"), h("option", { value: "team", selected: p.role === "team" }, "צוות"))),
+    h("td", {}, h("select", { "aria-label": "לקוח משויך", disabled: p.role === "team", onchange: e => setProfile(p.id, { client_id: e.target.value || null }) },
+      h("option", { value: "" }, "ללא"), S.clients.map(c => h("option", { value: c.id, selected: c.id === p.client_id }, c.name))))));
+
+  overlay(h("div", { class: "modal", role: "dialog", "aria-label": "לקוחות ומשתמשים" },
+    h("div", { class: "modal-head" }, h("h2", {}, "לקוחות ומשתמשים"), h("button", { class: "btn", onclick: closeModals }, "סגור")),
+    h("div", { class: "add-row" }, name, h("button", { class: "btn primary", onclick: add }, "הוסף לקוח")),
+    h("section", { class: "panel" }, h("h3", {}, "משתמשים"),
+      h("p", { class: "notice" }, "משתמש חדש נרשם בעצמו בדף הכניסה, ואז מופיע כאן כדי לשייך אותו ללקוח."),
+      h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "אימייל"), h("th", {}, "תפקיד"), h("th", {}, "לקוח"))), h("tbody", {}, users))))));
+}
+
+/* ---------- טעינה ואתחול ---------- */
+async function load() {
+  const [c, t, n, p] = await Promise.all(["clients", "tasks", "notes", "profiles"].map(x => sb.from(x).select("*")));
+  S.clients = (c.data || []).sort(byCreated); S.tasks = t.data || []; S.notes = n.data || [];
+  const all = p.data || [];
+  S.me = all.find(x => x.id === S.uid) || S.me;
+  S.profiles = isTeam() ? all : [];
+  if (isTeam() && !S.clients.find(x => x.id === S.selClient)) S.selClient = S.clients[0] ? S.clients[0].id : "";
+  const a = document.activeElement;
+  if (a && a.closest && a.closest(".modal") && /INPUT|TEXTAREA/.test(a.tagName)) return;
+  render();
+}
+
+async function onSession(session) {
+  closeModals();
+  if (!session) { S.me = null; renderLogin(); return; }
+  S.uid = session.user.id;
+  await load();
+  if (!S.me) $app.replaceChildren(h("p", { class: "notice" }, "טוען פרופיל…"));
+}
+
+function boot() {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    $app.replaceChildren(h("div", { class: "panel" }, h("h2", {}, "חסרות הגדרות חיבור"), h("p", {}, "מלאו SUPABASE_URL ו-SUPABASE_ANON_KEY בתחילת הסקריפט ב-index.html.")));
+    return;
+  }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  sb.auth.onAuthStateChange((_e, session) => { setTimeout(() => onSession(session), 0); });
+  sb.channel("changes").on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => S.me && load())
+    .on("postgres_changes", { event: "*", schema: "public", table: "notes" }, () => S.me && load()).subscribe();
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModals(); });
+boot();
+</script>
+</body>
+</html>
