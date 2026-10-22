@@ -210,7 +210,7 @@ function render() {
       if (st.key === "todo") col.append(addTaskRow());
       board.append(col);
     }
-    kids.push(board, historyPanel());
+    kids.push(board);
   }
   $app.replaceChildren(...kids);
   if (S.openTask) renderModal();
@@ -238,17 +238,15 @@ function addTaskRow() {
   return h("div", { class: "add-row" }, input, h("button", { class: "btn primary", onclick: add }, "הוסף"));
 }
 
-function historyPanel() {
-  const ids = new Set(visibleTasks().map(t => t.id));
-  const done = S.notes.filter(n => n.handled && ids.has(n.task_id)).sort((a, b) => a.handled_at < b.handled_at ? 1 : -1);
-  const title = id => (S.tasks.find(t => t.id === id) || {}).title || "";
-  return h("section", { class: "history" }, h("h2", {}, "היסטוריית הערות שטופלו"),
-    done.length ? h("div", { class: "tablewrap" }, h("table", {},
-      h("thead", {}, h("tr", {}, h("th", {}, "משימה"), h("th", {}, "תיאור"), h("th", {}, "רזולוציה"), h("th", {}, "קובץ"), h("th", { class: "num" }, "תאריך טיפול"), isTeam() ? h("th", {}) : null)),
-      h("tbody", {}, done.map(n => h("tr", {}, h("td", {}, title(n.task_id)), h("td", {}, n.text), h("td", {}, n.resolution),
+function taskHistory(t) {
+  const done = S.notes.filter(n => n.task_id === t.id && n.handled).sort((a, b) => a.handled_at < b.handled_at ? 1 : -1);
+  if (!done.length) return null;
+  return h("section", { class: "panel" }, h("h3", {}, "היסטוריית הערות שטופלו"),
+    h("div", { class: "tablewrap" }, h("table", {},
+      h("thead", {}, h("tr", {}, h("th", {}, "תיאור"), h("th", {}, "רזולוציה"), h("th", {}, "קובץ"), h("th", { class: "num" }, "תאריך טיפול"), isTeam() ? h("th", {}) : null)),
+      h("tbody", {}, done.map(n => h("tr", {}, h("td", {}, n.text), h("td", {}, n.resolution),
         h("td", {}, n.file_path ? fileLink(n.file_path, n.file_name) : "—"), h("td", { class: "num" }, fmt(n.handled_at)),
-        isTeam() ? h("td", {}, h("button", { class: "btn", onclick: () => run(sb.from("notes").update({ handled: false, handled_at: null }).eq("id", n.id)) }, "החזר")) : null)))))
-      : h("p", { class: "notice" }, "הערות שסומנו כטופלו יופיעו כאן."));
+        isTeam() ? h("td", {}, h("button", { class: "btn", onclick: () => run(sb.from("notes").update({ handled: false, handled_at: null }).eq("id", n.id)) }, "החזר")) : null))))));
 }
 
 /* ---------- חלון משימה ---------- */
@@ -294,6 +292,7 @@ function renderModal() {
   body.push(h("div", { class: "field" }, h("label", {}, "קובץ"), fr));
 
   if (t.status === "wait") body.push(notesSection(t));
+  body.push(taskHistory(t));
   if (team) body.push(h("div", { class: "row" }, h("button", { class: "btn danger", id: "del-task", onclick: function () {
     if (!this.dataset.sure) { this.dataset.sure = 1; this.textContent = "לחצו שוב למחיקה"; return; }
     closeModals(); run(sb.from("tasks").delete().eq("id", t.id));
