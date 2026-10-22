@@ -220,7 +220,7 @@ function render() {
 function taskCard(t) {
   const open = S.notes.filter(n => n.task_id === t.id && !n.handled).length;
   const go = () => { S.openTask = t.id; renderModal(); };
-  const c = h("div", { class: "card", tabindex: "0", role: "button", draggable: isTeam(), onclick: go, onkeydown: e => { if (e.key === "Enter") go(); } },
+  const c = h("div", { class: "card", tabindex: "0", role: "button", draggable: isTeam() ? "true" : null, onclick: go, onkeydown: e => { if (e.key === "Enter") go(); } },
     h("span", { class: "t" }, t.title),
     h("div", { class: "meta" }, t.file_path ? h("span", { class: "chip" }, "קובץ מצורף") : null,
       t.status === "wait" && open ? h("span", { class: "chip open" }, open + " הערות פתוחות") : null));
