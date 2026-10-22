@@ -35,6 +35,7 @@ create table public.notes (
   handled_at timestamptz,
   file_path text,
   file_name text,
+  images jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
 );
 

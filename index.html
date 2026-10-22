@@ -76,6 +76,10 @@ input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); c
 .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .row > * { min-width: 0; }
 .status-badge { display: inline-block; padding: 1px 10px; border-radius: 99px; color: #fff; font-size: 13px; background: var(--c); }
+.thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.thumbs img { max-width: 140px; max-height: 100px; border: 1px solid var(--line); border-radius: 4px; display: block; }
+.thumbs .x { position: relative; }
+.thumbs .x button { position: absolute; top: 2px; inset-inline-end: 2px; padding: 0 6px; }
 .hint { background: color-mix(in srgb, var(--s-wait) 14%, var(--surface)); border: 1px solid var(--s-wait); border-radius: 6px; padding: 8px 12px; font-size: 14px; margin: 0; }
 .login { max-width: 380px; margin: 8vh auto 0; display: flex; flex-direction: column; gap: 12px; }
 .toast { position: fixed; bottom: 16px; left: 16px; right: 16px; max-width: 480px; margin: auto; z-index: 40; }
@@ -100,7 +104,7 @@ const STATUSES = [
 ];
 const RESOLUTIONS = ["מחשב נייח", "נייד", "אייפון", "אנדרואיד"];
 
-const S = { clients: [], tasks: [], notes: [], profiles: [], me: null, selClient: "", openTask: null, showClients: false };
+const S = { pending: [], clients: [], tasks: [], notes: [], profiles: [], me: null, selClient: "", openTask: null, showClients: false };
 let sb;
 const $app = document.getElementById("app");
 const isTeam = () => S.me && S.me.role === "team";
@@ -149,6 +153,32 @@ function fileLink(path, name) {
     if (error) { if (w) w.close(); toast("פתיחת הקובץ נכשלה"); return; }
     if (w) w.location = data.signedUrl; else location.href = data.signedUrl;
   } }, name);
+}
+
+const urlCache = {};
+async function signed(path) {
+  const c = urlCache[path]; if (c && c.exp > Date.now()) return c.url;
+  const { data } = await sb.storage.from("files").createSignedUrl(path, 3600);
+  if (!data) return null;
+  urlCache[path] = { url: data.signedUrl, exp: Date.now() + 3000000 };
+  return data.signedUrl;
+}
+function thumbs(list) {
+  return h("div", { class: "thumbs" }, (list || []).map(im => {
+    const img = h("img", { alt: im.name || "תמונה" });
+    signed(im.path).then(u => { if (u) img.src = u; });
+    return h("a", { href: "#", onclick: async e => {
+      e.preventDefault();
+      const w = window.open("", "_blank"), u = await signed(im.path);
+      if (w) { if (u) w.location = u; else w.close(); }
+    } }, img);
+  }));
+}
+const clipImages = e => [...(e.clipboardData ? e.clipboardData.items : [])].filter(i => i.kind === "file" && i.type.startsWith("image/")).map(i => i.getAsFile()).filter(Boolean);
+async function uploadImages(files, clientId) {
+  const out = [];
+  for (const f of files) { const r = await uploadFile(f, clientId); out.push({ path: r.file_path, name: r.file_name }); }
+  return out;
 }
 
 /* ---------- התחברות ---------- */
@@ -244,13 +274,13 @@ function taskHistory(t) {
   return h("section", { class: "panel" }, h("h3", {}, "היסטוריית הערות שטופלו"),
     h("div", { class: "tablewrap" }, h("table", {},
       h("thead", {}, h("tr", {}, h("th", {}, "תיאור"), h("th", {}, "רזולוציה"), h("th", {}, "קובץ"), h("th", { class: "num" }, "תאריך טיפול"), isTeam() ? h("th", {}) : null)),
-      h("tbody", {}, done.map(n => h("tr", {}, h("td", {}, n.text), h("td", {}, n.resolution),
+      h("tbody", {}, done.map(n => h("tr", {}, h("td", {}, n.text, thumbs(n.images)), h("td", {}, n.resolution),
         h("td", {}, n.file_path ? fileLink(n.file_path, n.file_name) : "—"), h("td", { class: "num" }, fmt(n.handled_at)),
         isTeam() ? h("td", {}, h("button", { class: "btn", onclick: () => run(sb.from("notes").update({ handled: false, handled_at: null }).eq("id", n.id)) }, "החזר")) : null))))));
 }
 
 /* ---------- חלון משימה ---------- */
-function closeModals() { S.openTask = null; S.showClients = false; document.querySelectorAll(".overlay").forEach(o => o.remove()); }
+function closeModals() { S.pending = []; S.openTask = null; S.showClients = false; document.querySelectorAll(".overlay").forEach(o => o.remove()); }
 function overlay(content) {
   const old = document.querySelector(".overlay"), scroll = old ? old.scrollTop : 0;
   if (old) old.remove();
@@ -309,7 +339,13 @@ function notesSection(t) {
   const tbody = h("tbody", {}, open.map(n => {
     const ta = h("textarea", { "aria-label": "תיאור ההערה", style: "min-height:56px", onchange: e => upd(n, { text: e.target.value }) });
     ta.value = n.text;
-    return h("tr", {}, h("td", {}, ta),
+    ta.addEventListener("paste", async e => {
+      const imgs = clipImages(e); if (!imgs.length) return;
+      e.preventDefault(); ta.blur();
+      try { const added = await uploadImages(imgs, t.client_id); await run(sb.from("notes").update({ images: [...(n.images || []), ...added] }).eq("id", n.id)); }
+      catch (err) { toast("העלאת התמונה נכשלה: " + err.message); }
+    });
+    return h("tr", {}, h("td", {}, ta, thumbs(n.images)),
       h("td", {}, h("select", { "aria-label": "רזולוציה", onchange: e => upd(n, { resolution: e.target.value }) },
         RESOLUTIONS.map(r => h("option", { value: r, selected: r === n.resolution }, r)))),
       h("td", {}, n.file_path ? fileLink(n.file_path, n.file_name) : h("span", { class: "notice" }, "—")),
@@ -322,14 +358,25 @@ function notesSection(t) {
 
   const text = h("textarea", { id: "new-note", placeholder: "תיאור ההערה…", "aria-label": "הערה חדשה" });
   const res = h("select", { id: "new-note-res", "aria-label": "רזולוציה", style: "width:auto" }, RESOLUTIONS.map(r => h("option", { value: r }, r)));
+  const pv = h("div", { class: "thumbs" });
+  const drawPending = () => pv.replaceChildren(...S.pending.map((f, i) => {
+    const img = h("img", { alt: "תמונה מודבקת", src: URL.createObjectURL(f) });
+    return h("div", { class: "x" }, img, h("button", { class: "btn", "aria-label": "הסר תמונה", onclick: () => { S.pending.splice(i, 1); drawPending(); } }, "×"));
+  }));
+  text.addEventListener("paste", e => {
+    const imgs = clipImages(e); if (!imgs.length) return;
+    e.preventDefault(); S.pending.push(...imgs); drawPending();
+  });
+  drawPending();
   const file = h("input", { type: "file", id: "new-note-file", "aria-label": "צרף קובץ להערה", style: "max-width:100%" });
-  sec.append(h("div", { class: "field" }, h("label", { for: "new-note" }, "הערה חדשה"), text,
+  sec.append(h("div", { class: "field" }, h("label", { for: "new-note" }, "הערה חדשה (אפשר להדביק תמונה)"), text, pv,
     h("div", { class: "row" }, res, file, h("button", { class: "btn primary", onclick: async function () {
-      const v = text.value.trim(); if (!v) return;
+      const v = text.value.trim(); if (!v && !S.pending.length) return;
       this.disabled = true;
       try {
         const f = file.files[0] ? await uploadFile(file.files[0], t.client_id) : {};
-        if (await run(sb.from("notes").insert({ task_id: t.id, client_id: t.client_id, text: v, resolution: res.value, ...f }))) { text.value = ""; file.value = ""; }
+        const images = await uploadImages(S.pending, t.client_id);
+        if (await run(sb.from("notes").insert({ task_id: t.id, client_id: t.client_id, text: v, resolution: res.value, images, ...f }))) { text.value = ""; file.value = ""; S.pending = []; drawPending(); }
       } catch (e) { toast("השמירה נכשלה: " + e.message); }
       this.disabled = false;
     } }, "הוסף הערה"))));
