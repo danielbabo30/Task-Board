@@ -206,8 +206,8 @@ function render() {
           const id = e.dataTransfer.getData("text/plain"), t = S.tasks.find(x => x.id === id);
           if (t && t.status !== st.key) run(sb.from("tasks").update({ status: st.key }).eq("id", id));
         });
-        if (st.key === "todo") col.append(addTaskRow());
       }
+      if (st.key === "todo") col.append(addTaskRow());
       board.append(col);
     }
     kids.push(board, historyPanel());
@@ -232,7 +232,7 @@ function addTaskRow() {
   const input = h("input", { type: "text", id: "new-task", placeholder: "משימה חדשה…", "aria-label": "שם משימה חדשה" });
   const add = () => {
     const title = input.value.trim(); if (!title) return; input.value = "";
-    run(sb.from("tasks").insert({ client_id: S.selClient, title }));
+    run(sb.from("tasks").insert({ client_id: myClientId(), title }));
   };
   input.addEventListener("keydown", e => { if (e.key === "Enter") add(); });
   return h("div", { class: "add-row" }, input, h("button", { class: "btn primary", onclick: add }, "הוסף"));

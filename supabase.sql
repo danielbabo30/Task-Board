@@ -71,6 +71,8 @@ create policy profiles_write on profiles for update using (is_team()) with check
 
 create policy tasks_read  on tasks for select using (is_team() or client_id = my_client());
 create policy tasks_write on tasks for all    using (is_team()) with check (is_team());
+-- לקוח יכול להוסיף משימה חדשה ללקוח שלו (בסטטוס 'מוכן לביצוע')
+create policy tasks_client_insert on tasks for insert with check (client_id = my_client() and status = 'todo');
 
 create policy notes_read   on notes for select using (is_team() or client_id = my_client());
 create policy notes_insert on notes for insert with check (is_team() or (client_id = my_client() and handled = false));
